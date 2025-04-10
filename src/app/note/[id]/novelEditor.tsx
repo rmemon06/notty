@@ -4,7 +4,8 @@ import Warning from '@/components/warning';
 import useNotes from '@/lib/context/NotesContext';
 import { Editor } from 'novel';
 import { useEffect, useState } from 'react';
-import { type JSONContent } from "@tiptap/core"
+import { type JSONContent } from '@tiptap/core';
+import MetricsDashboard from './metricsDashboard'; // Adjust the path as needed
 
 function NovelEditor({ id }: { id: string }) {
   const [data, setData] = useState<JSONContent | string>('');
@@ -13,6 +14,8 @@ function NovelEditor({ id }: { id: string }) {
   const [saveStatus, setSaveStatus] = useState('Saved');
   const [wordCount, setWordCount] = useState(0);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [characterCount, setCharacterCount] = useState(0);
+  const [readingTime, setReadingTime] = useState<number | undefined>(undefined);
 
   const { revalidateNotes, kv } = useNotes();
 
@@ -22,12 +25,11 @@ function NovelEditor({ id }: { id: string }) {
 
       if (response.status === 404) {
         return null;
-      }
-      else if (!response.ok) {
+      } else if (!response.ok) {
         throw new Error('Network response was not ok');
       }
 
-      const jsonData = await response.json() as JSONContent;
+      const jsonData = (await response.json()) as JSONContent;
       return jsonData;
     } catch (error) {
       console.error('Error loading data from cloud:', error);
@@ -70,17 +72,29 @@ function NovelEditor({ id }: { id: string }) {
 
   const handleUpdate = (editor: any) => {
     setSaveStatus('Unsaved');
-    // Calculate word count
+    // Get text from the editor
     const text = editor.getText();
-    const count = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
-    setWordCount(count);
+    
+    // Calculate word count
+    const trimmed = text.trim();
+    const newWordCount = trimmed === '' ? 0 : trimmed.split(/\s+/).length;
+    setWordCount(newWordCount);
+    
+    // Calculate character count (excluding spaces if desired)
+    const newCharacterCount = trimmed.replace(/\s+/g, '').length;
+    setCharacterCount(newCharacterCount);
+    
+    // Estimate reading time (average reading speed: 200 words per minute)
+    setReadingTime(newWordCount > 0 ? Math.ceil(newWordCount / 200) : 0);
   };
 
   const updateLastSavedTime = () => {
-    setLastSaved(new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    }));
+    setLastSaved(
+      new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    );
   };
 
   return (
@@ -97,9 +111,7 @@ function NovelEditor({ id }: { id: string }) {
             {saveStatus}
           </div>
           {lastSaved && (
-            <div className="text-sm text-stone-500">
-              Last saved: {lastSaved}
-            </div>
+            <div className="text-sm text-stone-500">Last saved: {lastSaved}</div>
           )}
         </div>
         <Editor
@@ -136,10 +148,12 @@ function NovelEditor({ id }: { id: string }) {
             }
           }}
         />
-        {/* Word count display */}
-        <div className="mt-4 text-center text-sm text-gray-500">
-          Word Count: {wordCount}
-        </div>
+        {/* Metrics Dashboard */}
+        <MetricsDashboard
+          wordCount={wordCount}
+          characterCount={characterCount}
+          readingTime={readingTime}
+        />
       </div>
     </>
   );
