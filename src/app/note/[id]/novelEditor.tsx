@@ -16,8 +16,10 @@ function NovelEditor({ id }: { id: string }) {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
   const [readingTime, setReadingTime] = useState<number | undefined>(undefined);
-
+  const [editorText, setEditorText] = useState('');
   const { revalidateNotes, kv } = useNotes();
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   const loadData = async () => {
     try {
@@ -36,6 +38,33 @@ function NovelEditor({ id }: { id: string }) {
       return null;
     }
   };
+
+
+  const handleSummarise = async () => {
+    setLoadingSummary(true);
+    setSummary(null);
+  
+    try {
+      const response = await fetch('/api/summarise', {
+        method: 'POST',
+        body: JSON.stringify({  text: editorText }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+  
+      if (!response.ok) throw new Error('Failed to summarise');
+  
+      const result = await response.json();
+      setSummary(result.summary);
+    } catch (err) {
+      console.error(err);
+      setSummary('Error generating summary.');
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
 
   // Effect to synchronize data
   useEffect(() => {
@@ -74,7 +103,7 @@ function NovelEditor({ id }: { id: string }) {
     setSaveStatus('Unsaved');
     // Get text from the editor
     const text = editor.getText();
-    
+    setEditorText(text);
     // Calculate word count
     const trimmed = text.trim();
     const newWordCount = trimmed === '' ? 0 : trimmed.split(/\s+/).length;
@@ -148,6 +177,22 @@ function NovelEditor({ id }: { id: string }) {
             }
           }}
         />
+        <div className="mb-4 flex justify-end">
+          <button
+          onClick={handleSummarise}
+          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+          disabled={loadingSummary}
+        >
+          {loadingSummary ? 'Summarising...' : 'Summarise Note'}
+        </button>
+      </div>
+
+{summary && (
+  <div className="my-4 rounded border p-4 shadow">
+    <h3 className="mb-2 font-semibold">AI Summary:</h3>
+    <p className="text-stone-700">{summary}</p>
+  </div>
+)}
         {/* Metrics Dashboard */}
         <MetricsDashboard
           wordCount={wordCount}
